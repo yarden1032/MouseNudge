@@ -28,7 +28,8 @@ internal sealed class InputSimulator
     private static void MoveMouse(MouseOptions options)
     {
         var (deltaX, deltaY) = GetMovement(options.GetDirection(), options.DistancePixels);
-        var canRestore = options.ReturnToStart && GetCursorPos(out var originalPosition);
+        Point originalPosition = default;
+        var canRestore = options.ReturnToStart && GetCursorPos(out originalPosition);
 
         SendMouseMove(deltaX, deltaY);
 
