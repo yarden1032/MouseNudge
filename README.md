@@ -1,5 +1,7 @@
 # MouseNudge
 
+[![Build and release](https://github.com/yarden1032/MouseNudge/actions/workflows/initial-release.yml/badge.svg)](https://github.com/yarden1032/MouseNudge/actions/workflows/initial-release.yml)
+
 A tiny, configuration-only Windows console application that periodically sends either a mouse movement or a keyboard press. There is no UI; edit `appsettings.json`, start the process, and stop it with `Ctrl+C`.
 
 ## Download a ready-to-run build
