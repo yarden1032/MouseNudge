@@ -128,14 +128,28 @@ internal sealed class KeyboardOptions
 
     public bool UseScanCode { get; init; } = true;
 
-    public int PressDurationMilliseconds { get; init; } = 80;
+    public int MinPressDurationMilliseconds { get; init; } = 50;
+
+    public int MaxPressDurationMilliseconds { get; init; } = 150;
 
     public ushort ResolveVirtualKeyCode()
     {
-        if (PressDurationMilliseconds is < 0 or > 5_000)
+        if (MinPressDurationMilliseconds is < 0 or > 5_000)
         {
             throw new InvalidOperationException(
-                "Keyboard.PressDurationMilliseconds must be between 0 and 5000.");
+                "Keyboard.MinPressDurationMilliseconds must be between 0 and 5000.");
+        }
+
+        if (MaxPressDurationMilliseconds is < 0 or > 5_000)
+        {
+            throw new InvalidOperationException(
+                "Keyboard.MaxPressDurationMilliseconds must be between 0 and 5000.");
+        }
+
+        if (MinPressDurationMilliseconds > MaxPressDurationMilliseconds)
+        {
+            throw new InvalidOperationException(
+                "Keyboard.MinPressDurationMilliseconds cannot be greater than Keyboard.MaxPressDurationMilliseconds.");
         }
 
         if (VirtualKeyCode.HasValue)

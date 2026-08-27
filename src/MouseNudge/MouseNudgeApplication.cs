@@ -45,8 +45,8 @@ internal static class MouseNudgeApplication
 
         if (HasArgument(args, "--once"))
         {
-            inputSimulator.Execute(options);
-            Console.WriteLine($"Executed once: {options.DescribeAction()}");
+            var executedAction = inputSimulator.Execute(options);
+            Console.WriteLine($"Executed once: {executedAction}");
             return 0;
         }
 
@@ -88,11 +88,11 @@ internal static class MouseNudgeApplication
             while (true)
             {
                 await Task.Delay(TimeSpan.FromSeconds(options.IntervalSeconds), cancellation.Token);
-                inputSimulator.Execute(options);
+                var executedAction = inputSimulator.Execute(options);
 
                 if (options.LogActions)
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {options.DescribeAction()}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {executedAction}");
                 }
             }
         }
