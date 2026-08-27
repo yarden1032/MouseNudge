@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 
 namespace MouseNudge;
@@ -49,6 +50,20 @@ internal static class MouseNudgeApplication
             return 0;
         }
 
+        WindowsKeepAwake? keepAwake;
+
+        try
+        {
+            keepAwake = WindowsKeepAwake.Start(options.KeepAwake);
+        }
+        catch (Win32Exception exception)
+        {
+            Console.Error.WriteLine($"Keep-awake error: {exception.Message}");
+            return 1;
+        }
+
+        using var keepAwakeScope = keepAwake;
+
         using var cancellation = new CancellationTokenSource();
         Console.CancelKeyPress += (_, eventArgs) =>
         {
@@ -59,6 +74,14 @@ internal static class MouseNudgeApplication
         Console.WriteLine("MouseNudge is running. Press Ctrl+C to stop.");
         Console.WriteLine($"Action: {options.DescribeAction()}");
         Console.WriteLine($"Interval: every {options.IntervalSeconds} second(s)");
+
+        if (options.KeepAwake.Enabled)
+        {
+            Console.WriteLine($"Windows keep-awake: {options.KeepAwake.Describe()}");
+        }
+
+        Console.WriteLine(
+            "VDI note: client-side input reaches the remote session only while the VDI window accepts keyboard/mouse input.");
 
         try
         {

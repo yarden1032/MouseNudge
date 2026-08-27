@@ -15,6 +15,8 @@ internal sealed class NudgeOptions
 
     public bool LogActions { get; init; } = true;
 
+    public KeepAwakeOptions KeepAwake { get; init; } = new();
+
     public MouseOptions Mouse { get; init; } = new();
 
     public KeyboardOptions Keyboard { get; init; } = new();
@@ -46,6 +48,8 @@ internal sealed class NudgeOptions
         {
             throw new InvalidOperationException("IntervalSeconds must be between 1 and 86400.");
         }
+
+        KeepAwake.Validate();
 
         switch (GetMode())
         {
@@ -122,8 +126,18 @@ internal sealed class KeyboardOptions
 
     public int? VirtualKeyCode { get; init; }
 
+    public bool UseScanCode { get; init; } = true;
+
+    public int PressDurationMilliseconds { get; init; } = 80;
+
     public ushort ResolveVirtualKeyCode()
     {
+        if (PressDurationMilliseconds is < 0 or > 5_000)
+        {
+            throw new InvalidOperationException(
+                "Keyboard.PressDurationMilliseconds must be between 0 and 5000.");
+        }
+
         if (VirtualKeyCode.HasValue)
         {
             if (VirtualKeyCode.Value is < 1 or > 255)
@@ -146,6 +160,32 @@ internal sealed class KeyboardOptions
     public string DescribeKey() => VirtualKeyCode.HasValue
         ? $"VK {VirtualKeyCode.Value}"
         : Key;
+}
+
+internal sealed class KeepAwakeOptions
+{
+    public bool Enabled { get; init; } = true;
+
+    public bool KeepSystemAwake { get; init; } = true;
+
+    public bool KeepDisplayOn { get; init; } = true;
+
+    public void Validate()
+    {
+        if (Enabled && !KeepSystemAwake && !KeepDisplayOn)
+        {
+            throw new InvalidOperationException(
+                "KeepAwake must enable KeepSystemAwake, KeepDisplayOn, or both.");
+        }
+    }
+
+    public string Describe() => (KeepSystemAwake, KeepDisplayOn) switch
+    {
+        (true, true) => "system and display",
+        (true, false) => "system",
+        (false, true) => "display",
+        _ => "nothing"
+    };
 }
 
 internal enum NudgeMode

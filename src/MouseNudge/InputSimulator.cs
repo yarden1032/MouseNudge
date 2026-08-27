@@ -8,7 +8,10 @@ internal sealed class InputSimulator
     private const uint InputMouse = 0;
     private const uint InputKeyboard = 1;
     private const uint MouseEventMove = 0x0001;
+    private const uint KeyEventExtendedKey = 0x0001;
     private const uint KeyEventKeyUp = 0x0002;
+    private const uint KeyEventScanCode = 0x0008;
+    private const uint MapVirtualKeyToScanCodeExtended = 4;
 
     public void Execute(NudgeOptions options)
     {
@@ -18,7 +21,7 @@ internal sealed class InputSimulator
                 MoveMouse(options.Mouse);
                 break;
             case NudgeMode.Keyboard:
-                PressKey(options.Keyboard.ResolveVirtualKeyCode());
+                PressKey(options.Keyboard);
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported mode: {options.Mode}");
@@ -51,7 +54,17 @@ internal sealed class InputSimulator
             currentPosition.X == movedPosition.X &&
             currentPosition.Y == movedPosition.Y)
         {
-            _ = SetCursorPos(originalPosition.X, originalPosition.Y);
+            // Send the return as another input event so remote desktop clients can observe it.
+            SendMouseMove(
+                originalPosition.X - currentPosition.X,
+                originalPosition.Y - currentPosition.Y);
+
+            // Pointer acceleration or a screen edge can make a relative move imprecise.
+            if (GetCursorPos(out var restoredPosition) &&
+                (restoredPosition.X != originalPosition.X || restoredPosition.Y != originalPosition.Y))
+            {
+                _ = SetCursorPos(originalPosition.X, originalPosition.Y);
+            }
         }
     }
 
@@ -90,36 +103,61 @@ internal sealed class InputSimulator
         Send(inputs);
     }
 
-    private static void PressKey(ushort virtualKeyCode)
+    private static void PressKey(KeyboardOptions options)
     {
-        var inputs = new[]
+        var virtualKeyCode = options.ResolveVirtualKeyCode();
+        var keyDown = CreateKeyboardInput(virtualKeyCode, options.UseScanCode, keyUp: false);
+        var keyUp = CreateKeyboardInput(virtualKeyCode, options.UseScanCode, keyUp: true);
+
+        Send([keyDown]);
+
+        try
         {
-            new Input
+            if (options.PressDurationMilliseconds > 0)
             {
-                Type = InputKeyboard,
-                Union = new InputUnion
-                {
-                    Keyboard = new KeyboardInput
-                    {
-                        VirtualKey = virtualKeyCode
-                    }
-                }
-            },
-            new Input
-            {
-                Type = InputKeyboard,
-                Union = new InputUnion
-                {
-                    Keyboard = new KeyboardInput
-                    {
-                        VirtualKey = virtualKeyCode,
-                        Flags = KeyEventKeyUp
-                    }
-                }
+                Thread.Sleep(options.PressDurationMilliseconds);
             }
+        }
+        finally
+        {
+            Send([keyUp]);
+        }
+    }
+
+    private static Input CreateKeyboardInput(ushort virtualKeyCode, bool useScanCode, bool keyUp)
+    {
+        var keyboardInput = new KeyboardInput
+        {
+            VirtualKey = virtualKeyCode,
+            Flags = keyUp ? KeyEventKeyUp : 0
         };
 
-        Send(inputs);
+        if (useScanCode)
+        {
+            var mappedScanCode = MapVirtualKey(virtualKeyCode, MapVirtualKeyToScanCodeExtended);
+
+            if (mappedScanCode != 0)
+            {
+                keyboardInput.VirtualKey = 0;
+                keyboardInput.ScanCode = (ushort)(mappedScanCode & 0xFF);
+                keyboardInput.Flags |= KeyEventScanCode;
+
+                var prefix = mappedScanCode & 0xFF00;
+                if (prefix is 0xE000 or 0xE100)
+                {
+                    keyboardInput.Flags |= KeyEventExtendedKey;
+                }
+            }
+        }
+
+        return new Input
+        {
+            Type = InputKeyboard,
+            Union = new InputUnion
+            {
+                Keyboard = keyboardInput
+            }
+        };
     }
 
     private static void Send(Input[] inputs)
@@ -134,6 +172,9 @@ internal sealed class InputSimulator
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint numberOfInputs, Input[] inputs, int inputSize);
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint code, uint mapType);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

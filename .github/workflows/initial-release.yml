@@ -1,4 +1,4 @@
-name: Build and publish initial release
+name: Build and publish release
 
 on:
   push:
@@ -12,8 +12,12 @@ on:
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: v1.1.0
+  RELEASE_ARCHIVE: MouseNudge-v1.1.0-win-x64.zip
+
 concurrency:
-  group: mouse-nudge-initial-release
+  group: mouse-nudge-release
   cancel-in-progress: false
 
 jobs:
@@ -50,26 +54,30 @@ jobs:
 
       - name: Create release archive
         shell: pwsh
-        run: >-
-          Compress-Archive
-          -Path .\artifacts\win-x64\*
-          -DestinationPath .\MouseNudge-v1.0.0-win-x64.zip
-          -Force
+        run: |
+          Compress-Archive `
+            -Path .\artifacts\win-x64\* `
+            -DestinationPath ".\$env:RELEASE_ARCHIVE" `
+            -Force
 
-      - name: Create v1.0.0 release
+      - name: Validate published executable
+        shell: pwsh
+        run: .\artifacts\win-x64\MouseNudge.exe --validate
+
+      - name: Create release
         if: github.event_name != 'pull_request'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if (gh release view v1.0.0 --repo $env:GITHUB_REPOSITORY 2>$null) {
-            Write-Host "Release v1.0.0 already exists; nothing to create."
+          if (gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY 2>$null) {
+            Write-Host "Release $env:RELEASE_TAG already exists; nothing to create."
             exit 0
           }
 
-          gh release create v1.0.0 `
-            .\MouseNudge-v1.0.0-win-x64.zip `
+          gh release create $env:RELEASE_TAG `
+            ".\$env:RELEASE_ARCHIVE" `
             --repo $env:GITHUB_REPOSITORY `
             --target $env:GITHUB_SHA `
-            --title "MouseNudge v1.0.0" `
+            --title "MouseNudge $env:RELEASE_TAG" `
             --notes-file .\RELEASE_NOTES.md
