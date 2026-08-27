@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace MouseNudge;
 
@@ -13,19 +14,26 @@ internal sealed class InputSimulator
     private const uint KeyEventScanCode = 0x0008;
     private const uint MapVirtualKeyToScanCodeExtended = 4;
 
-    public void Execute(NudgeOptions options)
+    public string Execute(NudgeOptions options)
     {
-        switch (options.GetMode())
+        return options.GetMode() switch
         {
-            case NudgeMode.Mouse:
-                MoveMouse(options.Mouse);
-                break;
-            case NudgeMode.Keyboard:
-                PressKey(options.Keyboard);
-                break;
-            default:
-                throw new InvalidOperationException($"Unsupported mode: {options.Mode}");
-        }
+            NudgeMode.Mouse => ExecuteMouse(options),
+            NudgeMode.Keyboard => ExecuteKeyboard(options),
+            _ => throw new InvalidOperationException($"Unsupported mode: {options.Mode}")
+        };
+    }
+
+    private static string ExecuteMouse(NudgeOptions options)
+    {
+        MoveMouse(options.Mouse);
+        return options.DescribeAction();
+    }
+
+    private static string ExecuteKeyboard(NudgeOptions options)
+    {
+        var durationMilliseconds = PressKey(options.Keyboard);
+        return $"{options.DescribeAction()} (held {durationMilliseconds} ms)";
     }
 
     private static void MoveMouse(MouseOptions options)
@@ -103,9 +111,12 @@ internal sealed class InputSimulator
         Send(inputs);
     }
 
-    private static void PressKey(KeyboardOptions options)
+    private static int PressKey(KeyboardOptions options)
     {
         var virtualKeyCode = options.ResolveVirtualKeyCode();
+        var durationMilliseconds = RandomNumberGenerator.GetInt32(
+            options.MinPressDurationMilliseconds,
+            options.MaxPressDurationMilliseconds + 1);
         var keyDown = CreateKeyboardInput(virtualKeyCode, options.UseScanCode, keyUp: false);
         var keyUp = CreateKeyboardInput(virtualKeyCode, options.UseScanCode, keyUp: true);
 
@@ -113,15 +124,17 @@ internal sealed class InputSimulator
 
         try
         {
-            if (options.PressDurationMilliseconds > 0)
+            if (durationMilliseconds > 0)
             {
-                Thread.Sleep(options.PressDurationMilliseconds);
+                Thread.Sleep(durationMilliseconds);
             }
         }
         finally
         {
             Send([keyUp]);
         }
+
+        return durationMilliseconds;
     }
 
     private static Input CreateKeyboardInput(ushort virtualKeyCode, bool useScanCode, bool keyUp)

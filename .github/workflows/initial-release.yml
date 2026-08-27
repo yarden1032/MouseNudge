@@ -13,8 +13,8 @@ permissions:
   contents: write
 
 env:
-  RELEASE_TAG: v1.1.0
-  RELEASE_ARCHIVE: MouseNudge-v1.1.0-win-x64.zip
+  RELEASE_TAG: v1.1.1
+  RELEASE_ARCHIVE: MouseNudge-v1.1.1-win-x64.zip
 
 concurrency:
   group: mouse-nudge-release
